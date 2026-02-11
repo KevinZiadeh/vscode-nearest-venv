@@ -43,7 +43,7 @@ function fileExists(p: string): boolean {
 function findNearestVenvPython(
   fileUri: vscode.Uri,
   folderNames: string[],
-  limitToWorkspace: boolean
+  limitToWorkspace: boolean,
 ): { pythonPath: string; venvPath: string; projectRoot: string } | undefined {
   const workspaceFolder = vscode.workspace.getWorkspaceFolder(fileUri);
   const workspaceRoot = workspaceFolder?.uri.fsPath;
@@ -64,7 +64,11 @@ function findNearestVenvPython(
       const candidates = getExecutableCandidates(venvDir);
       for (const candidate of candidates) {
         if (fileExists(candidate)) {
-          return { pythonPath: candidate, venvPath: venvDir, projectRoot: currentDir };
+          return {
+            pythonPath: candidate,
+            venvPath: venvDir,
+            projectRoot: currentDir,
+          };
         }
       }
     }
@@ -100,48 +104,52 @@ function getManagedExtraPathsKey(folder: vscode.WorkspaceFolder): string {
 
 function getManagedExtraPaths(
   context: vscode.ExtensionContext,
-  folder: vscode.WorkspaceFolder
+  folder: vscode.WorkspaceFolder,
 ): string[] {
   const state = context.workspaceState.get<Record<string, unknown>>(
     MANAGED_EXTRA_PATHS_STATE_KEY,
-    {}
+    {},
   );
   const raw = state[getManagedExtraPathsKey(folder)];
   if (!Array.isArray(raw)) {
     return [];
   }
   return raw
-    .filter((value): value is string => typeof value === "string" && value.length > 0)
+    .filter(
+      (value): value is string => typeof value === "string" && value.length > 0,
+    )
     .map((value) => normalizeAbsolutePath(value));
 }
 
 async function setManagedExtraPaths(
   context: vscode.ExtensionContext,
   folder: vscode.WorkspaceFolder,
-  paths: readonly string[]
+  paths: readonly string[],
 ): Promise<void> {
   const key = getManagedExtraPathsKey(folder);
   const state = {
     ...context.workspaceState.get<Record<string, unknown>>(
       MANAGED_EXTRA_PATHS_STATE_KEY,
-      {}
+      {},
     ),
   };
   const normalized = dedupeStrings(
-    paths.map((value) => normalizeAbsolutePath(value)).filter((value) => value.length > 0)
+    paths
+      .map((value) => normalizeAbsolutePath(value))
+      .filter((value) => value.length > 0),
   );
 
   if (normalized.length === 0) {
     if (key in state) {
       delete state[key];
       getOutput().appendLine(
-        `[pyright] [extraPaths:${folder.name}] cleared managed state`
+        `[pyright] [extraPaths:${folder.name}] cleared managed state`,
       );
     }
   } else {
     state[key] = normalized;
     getOutput().appendLine(
-      `[pyright] [extraPaths:${folder.name}] set managed=${JSON.stringify(normalized)}`
+      `[pyright] [extraPaths:${folder.name}] set managed=${JSON.stringify(normalized)}`,
     );
   }
 
@@ -150,7 +158,7 @@ async function setManagedExtraPaths(
 
 function getManagedIncludeKey(
   section: string,
-  folder: vscode.WorkspaceFolder
+  folder: vscode.WorkspaceFolder,
 ): string {
   return `${section}:${folder.uri.toString()}`;
 }
@@ -166,7 +174,7 @@ function toManagedArray(value: unknown): string[] {
 }
 
 function normalizeManagedIncludeEntry(
-  raw: unknown
+  raw: unknown,
 ): ManagedIncludeEntry | undefined {
   if (!raw) {
     return undefined;
@@ -187,11 +195,11 @@ function normalizeManagedIncludeEntry(
 function getManagedIncludeEntry(
   context: vscode.ExtensionContext,
   section: string,
-  folder: vscode.WorkspaceFolder
+  folder: vscode.WorkspaceFolder,
 ): ManagedIncludeEntry | undefined {
   const state = context.workspaceState.get<Record<string, unknown>>(
     MANAGED_INCLUDE_STATE_KEY,
-    {}
+    {},
   );
   const raw = state[getManagedIncludeKey(section, folder)];
   return normalizeManagedIncludeEntry(raw);
@@ -201,12 +209,12 @@ async function setManagedIncludeEntry(
   context: vscode.ExtensionContext,
   section: string,
   folder: vscode.WorkspaceFolder,
-  entry: ManagedIncludeEntry
+  entry: ManagedIncludeEntry,
 ): Promise<void> {
   const state = {
     ...context.workspaceState.get<Record<string, unknown>>(
       MANAGED_INCLUDE_STATE_KEY,
-      {}
+      {},
     ),
   };
   const key = getManagedIncludeKey(section, folder);
@@ -214,14 +222,14 @@ async function setManagedIncludeEntry(
   if (managed.length === 0) {
     delete state[key];
     getOutput().appendLine(
-      `[pyright] [include:${section}:${folder.name}] cleared managed state`
+      `[pyright] [include:${section}:${folder.name}] cleared managed state`,
     );
   } else {
     state[key] = { managed };
     getOutput().appendLine(
       `[pyright] [include:${section}:${folder.name}] set managed=${JSON.stringify(
-        managed
-      )}`
+        managed,
+      )}`,
     );
   }
   await context.workspaceState.update(MANAGED_INCLUDE_STATE_KEY, state);
@@ -239,10 +247,7 @@ function dedupeStrings(values: readonly string[]): string[] {
   return result;
 }
 
-function arraysEqual(
-  a: readonly string[],
-  b: readonly string[]
-): boolean {
+function arraysEqual(a: readonly string[], b: readonly string[]): boolean {
   if (a.length !== b.length) {
     return false;
   }
@@ -251,13 +256,13 @@ function arraysEqual(
 
 async function setInterpreterForWorkspaceFolder(
   pythonPath: string,
-  folder: vscode.WorkspaceFolder
+  folder: vscode.WorkspaceFolder,
 ): Promise<void> {
   const config = vscode.workspace.getConfiguration("python", folder);
   const current = config.get<string>("defaultInterpreterPath");
   if (current === pythonPath) {
     getOutput().appendLine(
-      `[skip] Already set for '${folder.name}' -> ${pythonPath}`
+      `[skip] Already set for '${folder.name}' -> ${pythonPath}`,
     );
     return;
   }
@@ -267,17 +272,50 @@ async function setInterpreterForWorkspaceFolder(
   await pythonExtensionApi.environments.updateActiveEnvironmentPath(pythonPath);
 
   getOutput().appendLine(
-    `[set] ${folder.name}: python.defaultInterpreterPath = ${pythonPath}`
+    `[set] ${folder.name}: Updates active environment = ${pythonPath}`,
   );
+
+  const ruffConfig = vscode.workspace.getConfiguration("ruff", folder);
+  const baseDir = path.join(pythonPath, "/../../../");
+  const pyprojectUri = path.join(baseDir, "pyproject.toml");
+  const ruffTomlUri = path.join(baseDir, "ruff.toml");
+
+  let configPath: string | null = null;
+
+  if (fileExists(pyprojectUri)) {
+    configPath = pyprojectUri;
+  } else if (fileExists(ruffTomlUri)) {
+    configPath = ruffTomlUri;
+  }
+
+  if (configPath) {
+    await ruffConfig.update(
+      "configuration",
+      configPath,
+      vscode.ConfigurationTarget.Global,
+    );
+
+    getOutput().appendLine(
+      `[set] ${folder.name}: ruff.configuration = ${configPath}`,
+    );
+  } else {
+    await ruffConfig.update(
+      "configuration",
+      null,
+      vscode.ConfigurationTarget.Global,
+    );
+  }
 }
 
 function getSettingArray(
   config: vscode.WorkspaceConfiguration,
-  key: string
+  key: string,
 ): string[] {
   const existingRaw = config.get<unknown>(key);
   if (Array.isArray(existingRaw)) {
-    return existingRaw.filter((value): value is string => typeof value === "string");
+    return existingRaw.filter(
+      (value): value is string => typeof value === "string",
+    );
   }
   if (typeof existingRaw === "string") {
     return [existingRaw];
@@ -291,7 +329,7 @@ function normalizeAbsolutePath(value: string): string {
 
 function toAbsoluteNormalized(
   folder: vscode.WorkspaceFolder,
-  value: string
+  value: string,
 ): string {
   const absolute = path.isAbsolute(value)
     ? value
@@ -303,10 +341,10 @@ function pruneManagedExtraPaths(
   existing: string[],
   folder: vscode.WorkspaceFolder,
   folderNames: readonly string[],
-  currentSitePackages: readonly string[]
+  currentSitePackages: readonly string[],
 ): { retained: string[]; removed: string[] } {
   const normalizedTargets = new Set(
-    currentSitePackages.map((value) => normalizeAbsolutePath(value))
+    currentSitePackages.map((value) => normalizeAbsolutePath(value)),
   );
   const managedNames = folderNames
     .map((name) => normalizeAbsolutePath(name).replace(/^\/+|\/+$/g, ""))
@@ -345,7 +383,7 @@ async function ensureSettingArrayContains(
   config: vscode.WorkspaceConfiguration,
   key: string,
   values: readonly string[],
-  target: vscode.ConfigurationTarget
+  target: vscode.ConfigurationTarget,
 ): Promise<boolean> {
   const current = getSettingArray(config, key);
   const next = [...current];
@@ -402,7 +440,7 @@ function findSitePackagesPath(venvDir: string): string | undefined {
 
 function toWorkspaceRelativePath(
   folder: vscode.WorkspaceFolder,
-  absolutePath: string
+  absolutePath: string,
 ): string {
   const relative = path.relative(folder.uri.fsPath, absolutePath);
   if (!relative || relative.startsWith("..")) {
@@ -414,7 +452,7 @@ function toWorkspaceRelativePath(
 function collectOpenSitePackages(
   folder: vscode.WorkspaceFolder,
   folderNames: readonly string[],
-  limitToWorkspace: boolean
+  limitToWorkspace: boolean,
 ): string[] {
   const results: string[] = [];
   const seen = new Set<string>();
@@ -422,12 +460,13 @@ function collectOpenSitePackages(
   for (const editor of vscode.window.visibleTextEditors) {
     if (!isPythonEditor(editor)) continue;
     const docFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
-    if (!docFolder || docFolder.uri.toString() !== folder.uri.toString()) continue;
+    if (!docFolder || docFolder.uri.toString() !== folder.uri.toString())
+      continue;
 
     const result = findNearestVenvPython(
       editor.document.uri,
       [...folderNames],
-      limitToWorkspace
+      limitToWorkspace,
     );
     if (!result) continue;
     const docPath = normalizeAbsolutePath(editor.document.uri.fsPath);
@@ -456,7 +495,7 @@ async function updateManagedExtraPaths(
   managed:
     | { folderNames: string[]; sitePackages?: readonly string[] }
     | undefined,
-  target: vscode.ConfigurationTarget
+  target: vscode.ConfigurationTarget,
 ): Promise<boolean> {
   let current = [...getSettingArray(config, "analysis.extraPaths")];
   let changed = false;
@@ -466,7 +505,7 @@ async function updateManagedExtraPaths(
       current,
       folder,
       managed.folderNames,
-      managed.sitePackages
+      managed.sitePackages,
     );
     if (removed.length > 0) {
       changed = true;
@@ -481,7 +520,8 @@ async function updateManagedExtraPaths(
     if (!value) continue;
     const normalizedAddition = toAbsoluteNormalized(folder, value);
     const alreadyExists = current.some(
-      (existing) => toAbsoluteNormalized(folder, existing) === normalizedAddition
+      (existing) =>
+        toAbsoluteNormalized(folder, existing) === normalizedAddition,
     );
     if (!alreadyExists) {
       current.push(value);
@@ -504,13 +544,13 @@ async function updateManagedAnalysisInclude(
   folder: vscode.WorkspaceFolder,
   config: vscode.WorkspaceConfiguration,
   target: vscode.ConfigurationTarget,
-  analysisRoot: string
+  analysisRoot: string,
 ): Promise<boolean> {
   const logPrefix = `[include:${section}:${folder.name}]`;
   const inspect = config.inspect<unknown>("analysis.include");
   if (!inspect) {
     getOutput().appendLine(
-      `[pyright] ${logPrefix} analysis.include unsupported; skipping`
+      `[pyright] ${logPrefix} analysis.include unsupported; skipping`,
     );
     if (getManagedIncludeEntry(context, section, folder)) {
       await setManagedIncludeEntry(context, section, folder, { managed: [] });
@@ -525,12 +565,12 @@ async function updateManagedAnalysisInclude(
 
   getOutput().appendLine(
     `[pyright] ${logPrefix} current=${JSON.stringify(current)} managed=${JSON.stringify(
-      managedValues
-    )}`
+      managedValues,
+    )}`,
   );
 
   const filtered = dedupeStrings(
-    current.filter((value) => !managedSet.has(value))
+    current.filter((value) => !managedSet.has(value)),
   );
 
   const additions = analysisRoot ? [analysisRoot] : [];
@@ -539,8 +579,8 @@ async function updateManagedAnalysisInclude(
 
   getOutput().appendLine(
     `[pyright] ${logPrefix} filtered=${JSON.stringify(filtered)} additions=${JSON.stringify(
-      additions
-    )} final=${JSON.stringify(finalValues)}`
+      additions,
+    )} final=${JSON.stringify(finalValues)}`,
   );
 
   if (configChanged) {
@@ -555,7 +595,7 @@ async function updateManagedAnalysisInclude(
       managed: nextManaged,
     });
     getOutput().appendLine(
-      `[pyright] ${logPrefix} stored managed=${JSON.stringify(nextManaged)}`
+      `[pyright] ${logPrefix} stored managed=${JSON.stringify(nextManaged)}`,
     );
   }
 
@@ -571,7 +611,7 @@ async function configureAnalysisSection(
   managedExtraPaths:
     | { folderNames: string[]; sitePackages?: readonly string[] }
     | undefined,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
 ): Promise<boolean> {
   try {
     const config = vscode.workspace.getConfiguration(section, folder);
@@ -583,7 +623,7 @@ async function configureAnalysisSection(
       folder,
       config,
       target,
-      analysisRoot
+      analysisRoot,
     );
     if (includeUpdated) {
       updatedKeys.push("include");
@@ -594,7 +634,7 @@ async function configureAnalysisSection(
       updatedKeys.push("diagnosticMode");
     }
     const currentTypeCheckingMode = config.get<string>(
-      "analysis.typeCheckingMode"
+      "analysis.typeCheckingMode",
     );
     if (!currentTypeCheckingMode || currentTypeCheckingMode === "off") {
       await config.update("analysis.typeCheckingMode", "basic", target);
@@ -604,7 +644,7 @@ async function configureAnalysisSection(
       config,
       "analysis.exclude",
       defaultExcludes,
-      target
+      target,
     );
     if (excludeChanged) {
       updatedKeys.push("exclude");
@@ -612,14 +652,15 @@ async function configureAnalysisSection(
 
     const needsExtraPathsUpdate =
       extraPaths.length > 0 ||
-      (managedExtraPaths?.sitePackages && managedExtraPaths.folderNames.length > 0);
+      (managedExtraPaths?.sitePackages &&
+        managedExtraPaths.folderNames.length > 0);
     if (needsExtraPathsUpdate) {
       const extraPathsChanged = await updateManagedExtraPaths(
         config,
         folder,
         extraPaths,
         managedExtraPaths,
-        target
+        target,
       );
       if (extraPathsChanged) {
         updatedKeys.push("extraPaths");
@@ -631,12 +672,12 @@ async function configureAnalysisSection(
         ? `updates: ${updatedKeys.join(", ")}`
         : "already up to date";
     getOutput().appendLine(
-      `[pyright] ✓ Configured ${section}.analysis for '${folder.name}' (${summary}) -> analysis root: ${analysisRoot}`
+      `[pyright] ✓ Configured ${section}.analysis for '${folder.name}' (${summary}) -> analysis root: ${analysisRoot}`,
     );
     return true;
   } catch (error) {
     getOutput().appendLine(
-      `[pyright] ✗ Failed to configure ${section}.analysis: ${String(error)}`
+      `[pyright] ✗ Failed to configure ${section}.analysis: ${String(error)}`,
     );
     return false;
   }
@@ -648,7 +689,7 @@ async function configurePyrightVirtualWorkspace(
   venvPath: string,
   folder: vscode.WorkspaceFolder,
   folderNames: string[],
-  limitToWorkspace: boolean
+  limitToWorkspace: boolean,
 ): Promise<void> {
   // Make projectRoot relative to workspace folder for cleaner configuration
   const relativePath = path.relative(folder.uri.fsPath, projectRoot);
@@ -667,14 +708,14 @@ async function configurePyrightVirtualWorkspace(
   const sitePackages = findSitePackagesPath(venvPath);
   if (!sitePackages) {
     getOutput().appendLine(
-      `[pyright] ! Unable to locate site-packages under ${venvPath}`
+      `[pyright] ! Unable to locate site-packages under ${venvPath}`,
     );
   }
 
   const openSitePackages = collectOpenSitePackages(
     folder,
     folderNames,
-    limitToWorkspace
+    limitToWorkspace,
   );
   const desiredSitePackages = dedupeStrings([
     ...openSitePackages,
@@ -690,17 +731,17 @@ async function configurePyrightVirtualWorkspace(
   };
 
   const extraPaths = desiredSitePackages.map((absPath) =>
-    toWorkspaceRelativePath(folder, absPath)
+    toWorkspaceRelativePath(folder, absPath),
   );
 
   getOutput().appendLine(
     `[pyright] [extraPaths:${folder.name}] desired=${JSON.stringify(
-      desiredSitePackages
-    )} previous=${JSON.stringify(previousSitePackages)}`
+      desiredSitePackages,
+    )} previous=${JSON.stringify(previousSitePackages)}`,
   );
 
   getOutput().appendLine(
-    `[pyright] Configuring virtual workspace for analysis root: ${analysisRoot}`
+    `[pyright] Configuring virtual workspace for analysis root: ${analysisRoot}`,
   );
 
   // Try to configure VS Code Python extension
@@ -711,7 +752,7 @@ async function configurePyrightVirtualWorkspace(
     folder,
     extraPaths,
     managedExtraPaths,
-    context
+    context,
   );
 
   // Try to configure Cursor pyright extension
@@ -722,7 +763,7 @@ async function configurePyrightVirtualWorkspace(
     folder,
     extraPaths,
     managedExtraPaths,
-    context
+    context,
   );
 
   if (
@@ -736,26 +777,26 @@ async function configurePyrightVirtualWorkspace(
   // Summary
   if (vscodeSuccess && cursorSuccess) {
     getOutput().appendLine(
-      `[pyright] ✓ Successfully configured both VS Code and Cursor pyright settings`
+      `[pyright] ✓ Successfully configured both VS Code and Cursor pyright settings`,
     );
   } else if (vscodeSuccess) {
     getOutput().appendLine(
-      `[pyright] ✓ Successfully configured VS Code pyright settings (Cursor failed)`
+      `[pyright] ✓ Successfully configured VS Code pyright settings (Cursor failed)`,
     );
   } else if (cursorSuccess) {
     getOutput().appendLine(
-      `[pyright] ✓ Successfully configured Cursor pyright settings (VS Code failed)`
+      `[pyright] ✓ Successfully configured Cursor pyright settings (VS Code failed)`,
     );
   } else {
     getOutput().appendLine(
-      `[pyright] ✗ Failed to configure both VS Code and Cursor pyright settings`
+      `[pyright] ✗ Failed to configure both VS Code and Cursor pyright settings`,
     );
   }
 }
 
 async function maybeUpdateInterpreter(
   editor: vscode.TextEditor | undefined,
-  context: vscode.ExtensionContext
+  context: vscode.ExtensionContext,
 ) {
   if (!isPythonEditor(editor)) return;
 
@@ -769,12 +810,18 @@ async function maybeUpdateInterpreter(
   const limitToWorkspace = cfg.get<boolean>("limitToWorkspace", true);
   const configurePyright = cfg.get<boolean>(
     "configurePyrightVirtualWorkspace",
-    false
+    false,
   );
 
   const result = findNearestVenvPython(fileUri, folderNames, limitToWorkspace);
   if (!result) {
     getOutput().appendLine(`[miss] No venv found for ${fileUri.fsPath}`);
+    const pythonExtensionApi = await PythonExtension.api();
+    await pythonExtensionApi.ready;
+    await pythonExtensionApi.environments.updateActiveEnvironmentPath(
+      "/usr/bin/python",
+    );
+
     return;
   }
 
@@ -789,7 +836,7 @@ async function maybeUpdateInterpreter(
       venvPath,
       folder,
       folderNames,
-      limitToWorkspace
+      limitToWorkspace,
     );
   }
 }
@@ -804,7 +851,7 @@ export function activate(context: vscode.ExtensionContext) {
       } catch (err) {
         getOutput().appendLine(`[error] ${String(err)}`);
       }
-    }
+    },
   );
 
   disposables.push(onEditorChange);
@@ -815,9 +862,9 @@ export function activate(context: vscode.ExtensionContext) {
     async () => {
       await maybeUpdateInterpreter(vscode.window.activeTextEditor, context);
       vscode.window.showInformationMessage(
-        "Nearest Venv: Refresh complete. See output for details."
+        "Nearest Venv: Refresh complete. See output for details.",
       );
-    }
+    },
   );
   disposables.push(refreshCmd);
 
