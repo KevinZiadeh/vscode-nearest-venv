@@ -1,6 +1,7 @@
 import * as vscode from "vscode";
 import * as path from "path";
 import * as fs from "fs";
+import { PythonExtension } from "@vscode/python-extension";
 
 const MANAGED_INCLUDE_STATE_KEY = "nearestVenv.managedIncludes";
 const MANAGED_EXTRA_PATHS_STATE_KEY = "nearestVenv.managedExtraPaths";
@@ -261,11 +262,10 @@ async function setInterpreterForWorkspaceFolder(
     return;
   }
 
-  await config.update(
-    "defaultInterpreterPath",
-    pythonPath,
-    vscode.ConfigurationTarget.WorkspaceFolder
-  );
+  const pythonExtensionApi = await PythonExtension.api();
+  await pythonExtensionApi.ready;
+  await pythonExtensionApi.environments.updateActiveEnvironmentPath(pythonPath);
+
   getOutput().appendLine(
     `[set] ${folder.name}: python.defaultInterpreterPath = ${pythonPath}`
   );

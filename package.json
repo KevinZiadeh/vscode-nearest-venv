@@ -3,7 +3,7 @@
   "displayName": "Nearest Venv Interpreter",
   "description": "Automatically selects the nearest Python virtual environment for the active file and keeps VS Code/Cursor in sync.",
   "version": "1.0.3",
-  "publisher": "thespacebar",
+  "publisher": "Kevin Ziadeh",
   "engines": {
     "vscode": "^1.85.0"
   },
@@ -78,5 +78,8 @@
     "@types/node": "^20.11.0",
     "@types/vscode": "^1.85.0",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "@vscode/python-extension": "^1.0.6"
   }
 }
