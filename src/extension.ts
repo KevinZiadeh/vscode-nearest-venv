@@ -267,16 +267,24 @@ async function setInterpreterForWorkspaceFolder(
     return;
   }
 
-  const pythonExtensionApi = await PythonExtension.api();
-  await pythonExtensionApi.ready;
-  await pythonExtensionApi.environments.updateActiveEnvironmentPath(pythonPath);
+  await vscode.workspace
+    .getConfiguration("python", folder.uri)
+    .update(
+      "defaultInterpreterPath",
+      pythonPath,
+      vscode.ConfigurationTarget.WorkspaceFolder
+    );
 
   getOutput().appendLine(
     `[set] ${folder.name}: Updates active environment = ${pythonPath}`,
   );
 
+  const baseDir = path.join(pythonPath, "../../../");
   const ruffConfig = vscode.workspace.getConfiguration("ruff", folder);
-  const baseDir = path.join(pythonPath, "/../../../");
+  const tyConfig = vscode.workspace.getConfiguration("ty", folder);
+
+  // Since python path will always be **/.venv/bin/python -> need to always go up 3 levels 
+  // to get to the root of the project
   const pyprojectUri = path.join(baseDir, "pyproject.toml");
   const ruffTomlUri = path.join(baseDir, "ruff.toml");
 
@@ -292,7 +300,19 @@ async function setInterpreterForWorkspaceFolder(
     await ruffConfig.update(
       "configuration",
       configPath,
-      vscode.ConfigurationTarget.Global,
+      vscode.ConfigurationTarget.WorkspaceFolder,
+    );
+    const current = tyConfig.get<any>("configuration") ?? {};
+    await tyConfig.update(
+      "configuration",
+      {
+        ...current,
+        environment: {
+          ...current.environment,
+          "extra-paths": []
+        }
+      },
+      vscode.ConfigurationTarget.WorkspaceFolder
     );
 
     getOutput().appendLine(
@@ -302,7 +322,21 @@ async function setInterpreterForWorkspaceFolder(
     await ruffConfig.update(
       "configuration",
       null,
-      vscode.ConfigurationTarget.Global,
+      vscode.ConfigurationTarget.WorkspaceFolder,
+    );
+    const current = tyConfig.get<any>("configuration") ?? {};
+    await tyConfig.update(
+      "configuration",
+      {
+        ...current,
+        environment: {
+          ...current.environment,
+          "extra-paths": [
+            "/home/jdbh8887/.local/lib/python3.10/site-packages"
+          ]
+        }
+      },
+      vscode.ConfigurationTarget.WorkspaceFolder
     );
   }
 }
@@ -816,12 +850,12 @@ async function maybeUpdateInterpreter(
   const result = findNearestVenvPython(fileUri, folderNames, limitToWorkspace);
   if (!result) {
     getOutput().appendLine(`[miss] No venv found for ${fileUri.fsPath}`);
-    const pythonExtensionApi = await PythonExtension.api();
-    await pythonExtensionApi.ready;
-    await pythonExtensionApi.environments.updateActiveEnvironmentPath(
-      "/usr/bin/python",
-    );
-
+    // const pythonExtensionApi = await PythonExtension.api();
+    // await pythonExtensionApi.ready;
+    // await pythonExtensionApi.environments.updateActiveEnvironmentPath(
+    //   "/usr/bin/python",
+    // );
+    await setInterpreterForWorkspaceFolder("/usr/bin/python", folder)
     return;
   }
 
